@@ -119,7 +119,7 @@ require('dotenv').config();
   });                                                                                                            
                                                                                                                  
   // ---------- Quiz Endpoints ----------                                                                        
-  app.post('/quiz', async (req, res) => {                                                                        
+  app.post('/quiz', upload.any(), async (req, res) => {                                                                        
     const { title, creatorId, questions } = req.body;                                                            
     if (!title || !creatorId || !Array.isArray(questions) || questions.length === 0) {                           
       return res.status(400).json({ error: 'invalid quiz payload' });                                            
@@ -130,7 +130,18 @@ require('dotenv').config();
       if (!q.text || !Array.isArray(q.choices) || q.choices.length < 2 || q.correctAnswer === undefined) {       
         return res.status(400).json({ error: 'malformed question object' });                                     
       }                                                                                                          
-    }                                                                                                            
+    }
+    const files = req.files || [];
+    async function uploadToS3(file) {
+	    const key = `questions/${Date.now()}-${file.originalname}`;
+	    await s3.send(new PutObjectCommand({
+		    BUCKET: BUCKET,
+		    Key: key,
+		    Body: file.buffer,
+		    ContentType: file.mimetype
+	    }));
+	    return `https://${BUCKET}.s3.${REGION}.amazonaws.com/${key}`;
+    }
                                                                                                                  
     const quizId = makeId();                                                                                     
     const put = new PutCommand({                                                                                 
