@@ -120,7 +120,8 @@ require('dotenv').config();
                                                                                                                  
   // ---------- Quiz Endpoints ----------                                                                        
   app.post('/quiz', upload.any(), async (req, res) => {                                                                        
-    const { title, creatorId, questions } = req.body;                                                            
+    const { title, creatorId } = req.body;
+    const questions = JSON.parse(req.body.questions);
     if (!title || !creatorId || !Array.isArray(questions) || questions.length === 0) {                           
       return res.status(400).json({ error: 'invalid quiz payload' });                                            
     }                                                                                                            
@@ -131,16 +132,41 @@ require('dotenv').config();
         return res.status(400).json({ error: 'malformed question object' });                                     
       }                                                                                                          
     }
+    const parsedQuestions = JSON.parse(questions);
     const files = req.files || [];
+    const questionsWithImages = await Promise.all(
+	    parsedQuestions.map(async (q, i) => {
+		    const file = files.find(f => f.fieldname === `q_${i}_image`);
+		    let imageUrl = null;
+		    if (file) {
+			    imageUrl = await uploadtoS3(file);
+		    }
+		    return {
+			    text: q.text,
+			    choices: q.choices,
+			    correctAnswer: q.correctAnswer,
+			    imageUrl
+		    };
+	    })
+    );
+
     async function uploadToS3(file) {
 	    const key = `questions/${Date.now()}-${file.originalname}`;
 	    await s3.send(new PutObjectCommand({
-		    BUCKET: BUCKET,
+		    Bucket: BUCKET,
 		    Key: key,
 		    Body: file.buffer,
 		    ContentType: file.mimetype
 	    }));
 	    return `https://${BUCKET}.s3.${REGION}.amazonaws.com/${key}`;
+    }
+
+    for (let i = 0; i < questions.length; i++) {
+	    const file = files.find(f => f.fieldname === `q_${i}_image`);
+	    if (file) {
+		    const url = await uploadToS3(file);
+		    questions[i].imageUrl = url;
+	    }
     }
                                                                                                                  
     const quizId = makeId();                                                                                     
@@ -150,7 +176,7 @@ require('dotenv').config();
         quizId,                                                                                                  
         title,                                                                                                   
         creatorId,                                                                                               
-        questions, // we store the full object (including correctAnswer) – will be stripped on GET               
+        questions: questionsWithImages, // we store the full object (including correctAnswer) – will be stripped on GET               
       },                                                                                                         
     });                                                                                                          
                                                                                                                  

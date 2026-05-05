@@ -182,14 +182,25 @@
         // Build questions array from dynamic fields
         const questions=[];
         for(let i=0;i<qCount;i++){
-          const qText=form.get(`q_${i}_text`);
-          const choices=[
+		const imageFile = form.get(`q_${i}_image`);
+
+         questionsn.push({
+	   text: form.get(`q_${i}_text`),
+           choices: [
             form.get(`q_${i}_c0`),
             form.get(`q_${i}_c1`),
             form.get(`q_${i}_c2`),
             form.get(`q_${i}_c3`)
-          ];
-          const correctIdx=parseInt(form.get(`q_${i}_correct`),10);
+          ]
+          correctAnswer: parseInt(form.get(`q_${i}_correct`),10);
+          imageIndex: i
+	 });
+	}
+	form.set("questions", JSON.stringify(questions));
+	const res = await fetch("/quiz", {
+		method:"POST",
+		body: form
+	});
           if(qText && choices.every(c=>c)) {
             questions.push({
 		    text:qText,
