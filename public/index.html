@@ -71,7 +71,7 @@
         const form=new FormData(e.target);
         const data=new URLSearchParams();
         for(const [k,v] of form.entries()) data.append(k,v);
-	const action = form.get("action");
+	const action = e.submitter.value;
 	const endpoint = action === "signup" ? "/signup" : "/login";
         const res=await fetch(endpoint, {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:data});
         const txt=await res.text();
@@ -133,16 +133,28 @@
             form.get(`q_${i}_c3`)
           ];
           const correctIdx=parseInt(form.get(`q_${i}_correct`),10);
-          if(qText && choices.every(c=>c!==null)){
-            questions.push({question:qText, choices, correctIndex:correctIdx});
+          if(qText && choices.every(c=>c)) {
+            questions.push({
+		    text:qText,
+		    choices: choices,
+		    correctAnswer: correctIdx});
           }
         }
         if(questions.length>0){
           form.set('questions', JSON.stringify(questions));
         }
-        const res=await fetch('/create', {method:'POST', body:form});
-        const txt=await res.text();
-        document.getElementById('msg').innerHTML=txt;
+	console.log("Sending questions:", questions);
+	const res=await fetch('/quiz', {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json'},
+		body: JSON.stringify({
+			title: form.get('title'),
+			creatorId: 'test-user',
+			questions: JSON.parse(form.get('questions') || '[]')
+		})
+	});
+        const data = await res.json();
+        document.getElementById('msg').innerHTML = data.message || JSON.stringify(data);
       };
     }
   </script>
