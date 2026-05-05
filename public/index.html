@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Brain Brawl</title>
+  <style>
+    body{background:#121212;color:#fff;font-family:Arial,Helvetica,sans-serif;margin:0;padding:20px;}
+    a{color:#4ea5ff;text-decoration:none;cursor:pointer;}
+    nav a{margin-right:15px;}
+    h1,h2{color:#fff;}
+    input, textarea, select{background:#222;color:#fff;border:1px solid #444;padding:5px;margin:5px 0;width:100%;max-width:400px;}
+    button{background:#4ea5ff;color:#fff;border:none;padding:8px 12px;margin-top:10px;cursor:pointer;}
+    button:hover{background:#3b8ad9;}
+    .section{display:none;}
+    .active{display:block;}
+    .msg{margin-top:10px;color:#4ea5ff;}
+  </style>
+</head>
+<body>
+  <h1>Brain Brawl</h1>
+  <nav>
+    <a id="nav-home">Home</a>
+    <a id="nav-quizzes">Quizzes</a>
+    <a id="nav-trivia">Trivia</a>
+    <a id="nav-login">Login / Sign‑up</a>
+    <a id="nav-create">Create</a>
+  </nav>
+  <div id="home" class="section active">
+    <p>Welcome! Choose a section from the navigation above.</p>
+  </div>
+  <div id="quizzes" class="section"></div>
+  <div id="trivia" class="section"></div>
+  <div id="login" class="section"></div>
+  <div id="create" class="section"></div>
+  <div class="msg" id="msg"></div>
+
+  <script>
+    const sections = {home:'home', quizzes:'quizzes', trivia:'trivia', login:'login', create:'create'};
+    function show(sec){
+      Object.values(sections).forEach(id=>document.getElementById(id).classList.remove('active'));
+      document.getElementById(sec).classList.add('active');
+      document.getElementById('msg').textContent='';
+    }
+    document.getElementById('nav-home').onclick=()=>show('home');
+    document.getElementById('nav-quizzes').onclick=()=>{show('quizzes'); loadQuizzes();};
+    document.getElementById('nav-trivia').onclick=()=>{show('trivia'); loadTrivia();};
+    document.getElementById('nav-login').onclick=()=>{show('login'); renderLogin();};
+    document.getElementById('nav-create').onclick=()=>{show('create'); renderCreate();};
+
+    async function loadQuizzes(){
+      const res=await fetch('/quizzes');
+      const txt=await res.text();
+      document.getElementById('quizzes').innerHTML=txt;
+    }
+    async function loadTrivia(){
+      const res=await fetch('/trivia');
+      const txt=await res.text();
+      document.getElementById('trivia').innerHTML=txt;
+    }
+    function renderLogin(){
+      const html=`<h2>Login / Sign‑up</h2>
+        <form id="loginForm">
+          <label>Email: <input type="email" name="email" required></label><br>
+          <label>Password: <input type="password" name="password" required></label><br>
+          <button type="submit" name="action" value="login">Login</button>
+          <button type="submit" name="action" value="signup">Sign‑up</button>
+        </form>`;
+      document.getElementById('login').innerHTML=html;
+      document.getElementById('loginForm').onsubmit=async e=>{
+        e.preventDefault();
+        const form=new FormData(e.target);
+        const data=new URLSearchParams();
+        for(const [k,v] of form.entries()) data.append(k,v);
+        const res=await fetch('/login', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:data});
+        const txt=await res.text();
+        document.getElementById('msg').innerHTML=txt;
+      };
+    }
+    function renderCreate(){
+      const html=`<h2>Create Quiz / Trivia</h2>
+        <form id="createForm" enctype="multipart/form-data">
+          <label>Type: <select name="type" required><option value="quiz">Quiz</option><option value="trivia">Trivia</option></select></label><br>
+          <label>Title / Question:<br><input type="text" name="title" required style="width:300px;"/></label><br>
+          <label>Description / Answer:<br><textarea name="content" rows="4" cols="50" required></textarea></label><br>
+          <label>Image (optional): <input type="file" name="image" accept="image/*"/></label><br>
+          <div id="questionsContainer"></div>
+          <button type="button" id="addQuestionBtn">Add Question</button><br><br>
+          <button type="submit">Submit</button>
+        </form>`;
+      document.getElementById('create').innerHTML=html;
+      const container=document.getElementById('questionsContainer');
+      const addBtn=document.getElementById('addQuestionBtn');
+      let qCount=0;
+      function addQuestionBlock(){
+        const idx=qCount++;
+        const block=document.createElement('div');
+        block.innerHTML=`<fieldset style="margin-top:10px; border:1px solid #444; padding:10px;">
+          <legend>Question ${idx+1}</legend>
+          <label>Question Text:<br><input type="text" name="q_${idx}_text" required style="width:300px;"/></label><br>
+          <label>Choice 1: <input type="text" name="q_${idx}_c0" required/></label><br>
+          <label>Choice 2: <input type="text" name="q_${idx}_c1" required/></label><br>
+          <label>Choice 3: <input type="text" name="q_${idx}_c2" required/></label><br>
+          <label>Choice 4: <input type="text" name="q_${idx}_c3" required/></label><br>
+          <label>Correct Choice: 
+            <select name="q_${idx}_correct" required>
+              <option value="0">1</option>
+              <option value="1">2</option>
+              <option value="2">3</option>
+              <option value="3">4</option>
+            </select>
+          </label>
+          <label>Image (optional): <input type="file" name="q_${idx}_image" accept="image/*"/></label>
+        </fieldset>`;
+        container.appendChild(block);
+      }
+      addBtn.onclick=addQuestionBlock;
+      // start with one block
+      addQuestionBlock();
+
+      document.getElementById('createForm').onsubmit=async e=>{
+        e.preventDefault();
+        const form=new FormData(e.target);
+        // Build questions array from dynamic fields
+        const questions=[];
+        for(let i=0;i<qCount;i++){
+          const qText=form.get(`q_${i}_text`);
+          const choices=[
+            form.get(`q_${i}_c0`),
+            form.get(`q_${i}_c1`),
+            form.get(`q_${i}_c2`),
+            form.get(`q_${i}_c3`)
+          ];
+          const correctIdx=parseInt(form.get(`q_${i}_correct`),10);
+          if(qText && choices.every(c=>c!==null)){
+            questions.push({question:qText, choices, correctIndex:correctIdx});
+          }
+        }
+        if(questions.length>0){
+          form.set('questions', JSON.stringify(questions));
+        }
+        const res=await fetch('/create', {method:'POST', body:form});
+        const txt=await res.text();
+        document.getElementById('msg').innerHTML=txt;
+      };
+    }
+  </script>
+</body>
+</html>
