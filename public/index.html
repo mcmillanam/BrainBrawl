@@ -136,7 +136,7 @@
       };
     }
 
-n renderCreate() {
+function renderCreate() {
   const html = `
     <h2>Create Quiz / Trivia</h2>
 
@@ -226,6 +226,7 @@ n renderCreate() {
     }
 
     form.set("questions", JSON.stringify(questions));
+    form.set("creatorId", "test-user");
 
     const res = await fetch("/quiz", {
       method: "POST",
