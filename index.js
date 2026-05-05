@@ -32,6 +32,19 @@ const bucketName = 'brain-brawl-assets-mcmillanam'; // must exist in AWS account
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
 
+// Simple in‑memory session store (token → userId)
+const sessions = {};
+
+// Middleware to attach authenticated userId to request (expects `Authorization: Bearer <token>`)
+app.use((req, res, next) => {
+  const auth = req.headers.authorization;
+  if (auth && auth.startsWith('Bearer ')) {
+    const token = auth.slice(7);
+    req.userId = sessions[token];
+  }
+  next();
+});
+
 // Multer config – store files in memory before uploading to S3
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
@@ -129,26 +142,58 @@ app.get('/login', (req, res) => {
 // Simple in‑memory session store (token → email)
 const sessions = {};
 
-app.post('/login', (req, res) => {
+app.post('/login', async (req, res) => {
   const { username, password } = req.body;
-  // For now just acknowledge receipt.
-  res.send('Login received');
+  if (!username || !password) {
+    return res.status(400).json({ error: 'username and password required' });
+  }
+  try {
+    // Find user by username
+    const scanCmd = new ScanCommand({ TableName: 'Users', FilterExpression: 'username = :u', ExpressionAttributeValues: { ':u': username } });
+    const result = await ddb.send(scanCmd);
+    const user = result.Items && result.Items[0];
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+    const match = await bcrypt.compare(password, user.passwordHash);
+    if (!match) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+    // Generate session token
+    const token = randomBytes(24).toString('hex');
+    sessions[token] = user.userId;
+    // Return token (client should store and send as Bearer token)
+    res.json({ message: 'Login successful', token, userId: user.userId });
+  } catch (e) {
+    console.error('Login error:', e);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 // Sign‑up endpoint – stores user credentials in DynamoDB Users table
 app.post('/signup', async (req, res) => {
   const { username, password } = req.body;
+  if (!username || !password) {
+    return res.status(400).json({ error: 'username and password required' });
+  }
   try {
+    // Check if username already exists
+    const scanCmd = new ScanCommand({ TableName: 'Users', FilterExpression: 'username = :u', ExpressionAttributeValues: { ':u': username } });
+    const existing = await ddb.send(scanCmd);
+    if (existing.Items && existing.Items.length > 0) {
+      return res.status(409).json({ error: 'username already exists' });
+    }
     const hashedPassword = await bcrypt.hash(password, 10);
+    const userId = randomBytes(16).toString('hex');
     const putCmd = new PutCommand({
       TableName: 'Users',
-      Item: { userId: username, passwordHash: hashedPassword },
+      Item: { userId, username, passwordHash: hashedPassword },
     });
     await ddb.send(putCmd);
-    res.send('Signup successful');
+    res.json({ message: 'signup successful', userId });
   } catch (e) {
     console.error('Signup error:', e);
-    res.status(500).send('Error processing signup');
+    res.status(500).json({ error: 'Error processing signup' });
   }
 });
 
@@ -249,6 +294,10 @@ app.post('/create', upload.any(), async (req, res) => {
     ...(globalImageUrl && { imageUrl: globalImageUrl }),
     ...(questionArray.length && { questions: questionArray })
   };
+  // If user is authenticated, set creatorId (for quizzes)
+  if (req.userId) {
+    item.creatorId = req.userId;
+  }
   const putCmd = new PutCommand({
     TableName: type === 'quiz' ? 'Quizzes' : 'Trivia',
     Item: item

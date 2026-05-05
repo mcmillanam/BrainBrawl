@@ -69,13 +69,25 @@
 	    const quiz = await res.json();
 	    let html = `<h2>${quiz.title}</h2>`;
 	    quiz.questions.forEach((q, i) => {
+		    html += `<div style="margin-bottom:20px;">`;
+		    
 		    html += `<p>${i + 1}. ${q.text}</p>`;
+
+		    if (q.imageUrl) {
+			    html += `
+			    <img
+			       src="${q.imageUrl}"
+			       style="max-width:300px; display:block; margin-bottom:10px; border-radius:8px;"
+				    />
+				    `;
+		    }
 		    q.choices.forEach((c, idx) => {
 			    html += `<label>
 				    <input type="radio" name="q${i}" value="${idx}">
 				    ${c}
 				    </label><br>`;
 		    });
+		    html += `</div>`;
 	    });
 	    html += `<button onclick="submitQuiz('${quiz.quizId}')">Submit</button>`;
 	    document.getElementById('quizzes').innerHTML = html;

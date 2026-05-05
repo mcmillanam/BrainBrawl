@@ -128,7 +128,7 @@ require('dotenv').config();
     }
 
     // Parse questions safely (frontend sends JSON string)
-    let questions;
+    let questions = [];
     try {
       questions = JSON.parse(req.body.questions || '[]');
     } catch (err) {
