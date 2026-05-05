@@ -19,7 +19,9 @@ require('dotenv').config();
   } = require('@aws-sdk/client-s3');                                                                             
   const path = require('path');                                                                                  
                                                                                                                  
-  const app = express();                                                                                         
+  const app = express(); 
+  const multer = require('multer');
+  const upload = multer({ storage: multer.memoryStorage() });
                                                                                                                  
   // ---------- Configuration ----------                                                                         
   const PORT = process.env.PORT || 3000;                                                                         
@@ -67,7 +69,7 @@ require('dotenv').config();
 	});
       const existing = await ddb.send(scan);
       if (existing.Items && existing.Items.length > 0) {
-	      return res.status(409).jsjon({ error: 'username already taken' });
+	      return res.status(409).json({ error: 'username already taken' });
       }
       const hashed = await bcrypt.hash(password, 10);                                                            
       const put = new PutCommand({                                                                               
@@ -246,6 +248,24 @@ app.get('/leaderboard/:quizId', async (req, res) => {
     console.error('Leaderboard error:', e);
     res.status(500).json({ error: 'internal server error' });
   }
+});
+
+app.get('/quizzes', async (req, res) => {
+	try {
+		const scan = new ScanCommand({
+			TableName: 'Quizzes'
+		});
+		const result = await ddb.send(scan);
+		const safeQuizzes = (result.Items || []).map(q => ({
+			quizId: q.quizId,
+			title: q.title,
+			creatorId: q.creatorId
+		}));
+		res.json(safeQuizzes);
+	} catch (e) {
+		console.error('Get quizzes error:', e);
+		res.status(500).json({ error: 'failed to load quizzes' });
+	}
 });
 
 app.listen(PORT, "0.0.0.0", () => {

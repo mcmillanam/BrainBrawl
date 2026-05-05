@@ -49,14 +49,71 @@
 
     async function loadQuizzes(){
       const res=await fetch('/quizzes');
-      const txt=await res.text();
-      document.getElementById('quizzes').innerHTML=txt;
+      const data = await res.json();
+      if (!data.length) {
+	      document.getElementById('quizzes').innerHTML = "<p>No quizzes yet.</p>";
+	      return;
+      }
+      let html = "<h2>Available Quizzes</h2><ul>";
+      for (const quiz of data) {
+	      html += `<li>
+		      <strong>${quiz.title}</strong>
+		      <button onclick="playQuiz('${quiz.quizId}')">Play</button>
+	      </li>`;
+      }
+      html += "</ul>";
+      document.getElementById('quizzes').innerHTML = html;
+    }
+    async function playQuiz(id) {
+	    const res = await fetch(`/quiz/${id}`);
+	    const quiz = await res.json();
+	    let html = `<h2>${quiz.title}</h2>`;
+	    quiz.questions.forEach((q, i) => {
+		    html += `<p>${i + 1}. ${q.text}</p>`;
+		    q.choices.forEach((c, idx) => {
+			    html += `<label>
+				    <input type="radio" name="q${i}" value="${idx}">
+				    ${c}
+				    </label><br>`;
+		    });
+	    });
+	    html += `<button onclick="submitQuiz('${quiz.quizId}')">Submit</button>`;
+	    document.getElementById('quizzes').innerHTML = html;
+    }
+    async function submitQuiz(quizId) {
+	    const answers = [];
+	    const quizRes = await fetch(`/quiz/${quizId}`);
+	    const quiz = await quizRes.json();
+	    for (let i = 0; i < quiz.questions.length; i++) {
+		    const selected = document.querySelector(`input[name="q${i}"]:checked`);
+		    answers.push(selected ? parseInt(selected.value, 10) : null);
+	    }
+	    const res = await fetch(`/quiz/${quizId}/submit`, {
+		    method: "POST",
+		    headers: { "Content-Type": "application/json" },
+		    body: JSON.stringify({
+			    userId: "test-user",
+			    answers
+		    })
+	    });
+	    const data = await res.json();
+	    document.getElementById("msg").innerHTML = `Score: ${data.score}`;
     }
     async function loadTrivia(){
       const res=await fetch('/trivia');
       const txt=await res.text();
       document.getElementById('trivia').innerHTML=txt;
     }
+    async function uploadToS3(file) {
+		const key = `questions/${Date.now()}-$${file.originalname}`;
+		await s3.send(new PutObjectCommand({
+			     Bucket: BUCKET,
+			     Key: key,
+			     Body: file.buffer,
+			     ContentType: file.mimetype
+		}));
+		return `https://${BUCKET}.s3.${REGION}.amazonaws.com/${key}`;
+		}
     function renderLogin(){
       const html=`<h2>Login / Sign‑up</h2>
         <form id="loginForm">
