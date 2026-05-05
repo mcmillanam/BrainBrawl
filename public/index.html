@@ -136,95 +136,116 @@
       };
     }
     function renderCreate(){
-      const html=`<h2>Create Quiz / Trivia</h2>
-        <form id="createForm" enctype="multipart/form-data">
-          <label>Type: <select name="type" required><option value="quiz">Quiz</option><option value="trivia">Trivia</option></select></label><br>
-          <label>Title / Question:<br><input type="text" name="title" required style="width:300px;"/></label><br>
-          <label>Description / Answer:<br><textarea name="content" rows="4" cols="50" required></textarea></label><br>
-          <label>Image (optional): <input type="file" name="image" accept="image/*"/></label><br>
-          <div id="questionsContainer"></div>
-          <button type="button" id="addQuestionBtn">Add Question</button><br><br>
-          <button type="submit">Submit</button>
-        </form>`;
-      document.getElementById('create').innerHTML=html;
-      const container=document.getElementById('questionsContainer');
-      const addBtn=document.getElementById('addQuestionBtn');
-      let qCount=0;
-      function addQuestionBlock(){
-        const idx=qCount++;
-        const block=document.createElement('div');
-        block.innerHTML=`<fieldset style="margin-top:10px; border:1px solid #444; padding:10px;">
-          <legend>Question ${idx+1}</legend>
-          <label>Question Text:<br><input type="text" name="q_${idx}_text" required style="width:300px;"/></label><br>
-          <label>Choice 1: <input type="text" name="q_${idx}_c0" required/></label><br>
-          <label>Choice 2: <input type="text" name="q_${idx}_c1" required/></label><br>
-          <label>Choice 3: <input type="text" name="q_${idx}_c2" required/></label><br>
-          <label>Choice 4: <input type="text" name="q_${idx}_c3" required/></label><br>
-          <label>Correct Choice: 
-            <select name="q_${idx}_correct" required>
-              <option value="0">1</option>
-              <option value="1">2</option>
-              <option value="2">3</option>
-              <option value="3">4</option>
-            </select>
-          </label>
-          <label>Image (optional): <input type="file" name="q_${idx}_image" accept="image/*"/></label>
-        </fieldset>`;
-        container.appendChild(block);
-      }
-      addBtn.onclick=addQuestionBlock;
-      // start with one block
-      addQuestionBlock();
+      
+	    n renderCreate(){
+		      const html = `
+		        <h2>Create Quiz / Trivia</h2>
+		        <form id="createForm" enctype="multipart/form-data">
 
-      document.getElementById('createForm').onsubmit=async e=>{
-        e.preventDefault();
-        const form=new FormData(e.target);
-        // Build questions array from dynamic fields
-        const questions=[];
-        for(let i=0;i<qCount;i++){
-		const imageFile = form.get(`q_${i}_image`);
+		          <label>Type:
+		            <select name="type" required>
+		              <option value="quiz">Quiz</option>
+		              <option value="trivia">Trivia</option>
+		            </select>
+		          </label><br>
 
-         questionsn.push({
-	   text: form.get(`q_${i}_text`),
-           choices: [
-            form.get(`q_${i}_c0`),
-            form.get(`q_${i}_c1`),
-            form.get(`q_${i}_c2`),
-            form.get(`q_${i}_c3`)
-          ]
-          correctAnswer: parseInt(form.get(`q_${i}_correct`),10);
-          imageIndex: i
-	 });
-	}
-	form.set("questions", JSON.stringify(questions));
-	const res = await fetch("/quiz", {
-		method:"POST",
-		body: form
-	});
-          if(qText && choices.every(c=>c)) {
-            questions.push({
-		    text:qText,
-		    choices: choices,
-		    correctAnswer: correctIdx});
-          }
-        }
-        if(questions.length>0){
-          form.set('questions', JSON.stringify(questions));
-        }
-	console.log("Sending questions:", questions);
-	const res=await fetch('/quiz', {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/json'},
-		body: JSON.stringify({
-			title: form.get('title'),
-			creatorId: 'test-user',
-			questions: JSON.parse(form.get('questions') || '[]')
-		})
-	});
-        const data = await res.json();
-        document.getElementById('msg').innerHTML = data.message || JSON.stringify(data);
-      };
-    }
+		          <label>Title / Question:<br>
+		            <input type="text" name="title" required style="width:300px;" />
+		          </label><br>
+
+		          <label>Description / Answer:<br>
+		            <textarea name="content" rows="4" cols="50" required></textarea>
+		          </label><br>
+
+		          <div id="questionsContainer"></div>
+
+		          <button type="button" id="addQuestionBtn">Add Question</button><br><br>
+		          <button type="submit">Submit</button>
+		        </form>
+		      `;
+
+		      document.getElementById('create').innerHTML = html;
+
+		      const container = document.getElementById('questionsContainer');
+		      const addBtn = document.getElementById('addQuestionBtn');
+		      let qCount = 0;
+
+		      function addQuestionBlock(){
+			          const idx = qCount++;
+
+			          const block = document.createElement('div');
+			          block.innerHTML = `
+			            <fieldset style="margin-top:10px; border:1px solid #444; padding:10px;">
+			              <legend>Question ${idx + 1}</legend>
+
+			              <label>Question Text:<br>
+			                <input type="text" name="q_${idx}_text" required style="width:300px;" />
+			              </label><br>
+
+			              <label>Choice 1: <input type="text" name="q_${idx}_c0" required /></label><br>
+			              <label>Choice 2: <input type="text" name="q_${idx}_c1" required /></label><br>
+			              <label>Choice 3: <input type="text" name="q_${idx}_c2" required /></label><br>
+			              <label>Choice 4: <input type="text" name="q_${idx}_c3" required /></label><br>
+
+			              <label>Correct Choice:
+			                <select name="q_${idx}_correct" required>
+			                  <option value="0">1</option>
+			                  <option value="1">2</option>
+			                  <option value="2">3</option>
+			                  <option value="3">4</option>
+			                </select>
+			              </label><br>
+
+			              <label>Image (optional):
+			                <input type="file" name="q_${idx}_image" accept="image/*" />
+			              </label>
+
+			            </fieldset>
+			          `;
+
+			          container.appendChild(block);
+			        }
+
+		      addBtn.onclick = addQuestionBlock;
+
+		      // start with one question
+		      addQuestionBlock();
+
+		      document.getElementById('createForm').onsubmit = async (e) => {
+			          e.preventDefault();
+
+			          const form = new FormData(e.target);
+			          const questions = [];
+
+			          for (let i = 0; i < qCount; i++) {
+										       const choices = [
+										         form.get(`q_${i}_c0`),
+										         form.get(`q_${i}_c1`),
+										         form.get(`q_${i}_c2`),
+										         form.get(`q_${i}_c3`)
+										       ];
+
+										       questions.push({
+										         text: form.get(`q_${i}_text`),
+										         choices: choices,
+										         correctAnswer: parseInt(form.get(`q_${i}_correct`, 10)),
+										         imageIndex: i
+										       });
+										     }
+
+										     // attach JSON payload
+										     form.set("questions", JSON.stringify(questions));
+
+										     const res = await fetch("/quiz", {
+										       method: "POST",
+										       body: form   // IMPORTANT: multipart for multer + files
+										     });
+
+										     const data = await res.json();
+										     document.getElementById("msg").innerHTML =
+										       data.message || JSON.stringify(data);
+										   };
+										 }
   </script>
 </body>
 </html>

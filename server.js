@@ -119,75 +119,84 @@ require('dotenv').config();
   });                                                                                                            
                                                                                                                  
   // ---------- Quiz Endpoints ----------                                                                        
-  app.post('/quiz', upload.any(), async (req, res) => {                                                                        
+  app.post('/quiz', upload.any(), async (req, res) => {
+  try {
     const { title, creatorId } = req.body;
-    const questions = JSON.parse(req.body.questions);
-    if (!title || !creatorId || !Array.isArray(questions) || questions.length === 0) {                           
-      return res.status(400).json({ error: 'invalid quiz payload' });                                            
-    }                                                                                                            
-                                                                                                                 
-    // Basic validation of each question                                                                         
-    for (const q of questions) {                                                                                 
-      if (!q.text || !Array.isArray(q.choices) || q.choices.length < 2 || q.correctAnswer === undefined) {       
-        return res.status(400).json({ error: 'malformed question object' });                                     
-      }                                                                                                          
+
+    if (!title || !creatorId) {
+      return res.status(400).json({ error: 'missing title or creatorId' });
     }
-    const parsedQuestions = JSON.parse(questions);
+
+    // Parse questions safely (frontend sends JSON string)
+    let questions;
+    try {
+      questions = JSON.parse(req.body.questions || '[]');
+    } catch (err) {
+      return res.status(400).json({ error: 'invalid questions JSON' });
+    }
+
+    if (!Array.isArray(questions) || questions.length === 0) {
+      return res.status(400).json({ error: 'no questions provided' });
+    }
+
     const files = req.files || [];
+
+    // ---------- S3 UPLOAD ----------
+    const uploadToS3 = async (file) => {
+      const key = `questions/${Date.now()}-${file.originalname}`;
+
+      await s3.send(
+        new PutObjectCommand({
+          Bucket: BUCKET,
+          Key: key,
+          Body: file.buffer,
+          ContentType: file.mimetype,
+        })
+      );
+
+      return `https://${BUCKET}.s3.${REGION}.amazonaws.com/${key}`;
+    };
+
+    // ---------- ATTACH IMAGES ----------
     const questionsWithImages = await Promise.all(
-	    parsedQuestions.map(async (q, i) => {
-		    const file = files.find(f => f.fieldname === `q_${i}_image`);
-		    let imageUrl = null;
-		    if (file) {
-			    imageUrl = await uploadtoS3(file);
-		    }
-		    return {
-			    text: q.text,
-			    choices: q.choices,
-			    correctAnswer: q.correctAnswer,
-			    imageUrl
-		    };
-	    })
+      questions.map(async (q, i) => {
+        const file = files.find((f) => f.fieldname === `q_${i}_image`);
+
+        let imageUrl = null;
+        if (file) {
+          imageUrl = await uploadToS3(file);
+        }
+
+        return {
+          text: q.text,
+          choices: q.choices,
+          correctAnswer: q.correctAnswer,
+          imageUrl,
+        };
+      })
     );
 
-    async function uploadToS3(file) {
-	    const key = `questions/${Date.now()}-${file.originalname}`;
-	    await s3.send(new PutObjectCommand({
-		    Bucket: BUCKET,
-		    Key: key,
-		    Body: file.buffer,
-		    ContentType: file.mimetype
-	    }));
-	    return `https://${BUCKET}.s3.${REGION}.amazonaws.com/${key}`;
-    }
+    // ---------- SAVE QUIZ ----------
+    const quizId = makeId();
 
-    for (let i = 0; i < questions.length; i++) {
-	    const file = files.find(f => f.fieldname === `q_${i}_image`);
-	    if (file) {
-		    const url = await uploadToS3(file);
-		    questions[i].imageUrl = url;
-	    }
-    }
-                                                                                                                 
-    const quizId = makeId();                                                                                     
-    const put = new PutCommand({                                                                                 
-      TableName: 'Quizzes',                                                                                      
-      Item: {                                                                                                    
-        quizId,                                                                                                  
-        title,                                                                                                   
-        creatorId,                                                                                               
-        questions: questionsWithImages, // we store the full object (including correctAnswer) – will be stripped on GET               
-      },                                                                                                         
-    });                                                                                                          
-                                                                                                                 
-    try {                                                                                                        
-      await ddb.send(put);                                                                                       
-      res.json({ message: 'quiz created', quizId });                                                             
-    } catch (e) {                                                                                                
-      console.error('Create quiz error:', e);                                                                    
-      res.status(500).json({ error: 'internal server error' });                                                  
-    }                                                                                                            
-  });                                                                                                            
+    await ddb.send(
+      new PutCommand({
+        TableName: 'Quizzes',
+        Item: {
+          quizId,
+          title,
+          creatorId,
+          questions: questionsWithImages,
+        },
+      })
+    );
+
+    return res.json({ message: 'quiz created', quizId });
+  } catch (err) {
+    console.error('Create quiz error:', err);
+    return res.status(500).json({ error: 'internal server error' });
+  }
+});                                                                                                            
                                                                                                                  
   app.get('/quiz/:id', async (req, res) => {                                                                     
     const quizId = req.params.id;                                                                                
