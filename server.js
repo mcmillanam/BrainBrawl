@@ -48,13 +48,27 @@ require('dotenv').config();
   }                                                                                                              
                                                                                                                  
   // ---------- Auth Endpoints ----------                                                                        
-  app.post('/signup', async (req, res) => {                                                                      
+  app.post('/signup', async (req, res) => {
+	  console.log("=== SIGNUP HIT ===");
+	  console.log("BODY:", req.body);
+	  console.log("URL:", req.url);
     const { username, password } = req.body;                                                                     
     if (!username || !password) {                                                                                
       return res.status(400).json({ error: 'username and password required' });                                  
     }                                                                                                            
                                                                                                                  
-    try {                                                                                                        
+    try {
+      const scan = new ScanCommand({
+	      TableName: 'Users',
+	      FilterExpression: 'username = :u',
+	      ExpressionAttributeValues: {
+		      ':u': username
+	      }
+	});
+      const existing = await ddb.send(scan);
+      if (existing.Items && existing.Items.length > 0) {
+	      return res.status(409).jsjon({ error: 'username already taken' });
+      }
       const hashed = await bcrypt.hash(password, 10);                                                            
       const put = new PutCommand({                                                                               
         TableName: 'Users',                                                                                      
@@ -63,22 +77,11 @@ require('dotenv').config();
           username,                                                                                              
           password: hashed,                                                                                      
         },                                                                                                       
-        // Prevent overwriting an existing user with the same username                                           
-        const scan = new ScanCommand({
-		TableName: 'Users',
-		FilterExpression: 'username = :u',
-		ExpressionAttributeValues: {
-			':u': username
-		}
       });                                                                                                        
       await ddb.send(put);                                                                                       
       res.json({ message: 'signup successful' });                                                                
     } catch (e) {                                                                                                
-      console.error('Signup error:', e);                                                                         
-      // DynamoDB throws a ConditionalCheckFailedException if the username exists                                
-      if (e.name === 'ConditionalCheckFailedException') {                                                       
-        return res.status(409).json({ error: 'username already taken' });                                        
-      }                                                                                                          
+      console.error('Signup error:', e);                                                                                                 
       res.status(500).json({ error: 'internal server error' });                                                  
     }                                                                                                            
   });                                                                                                            
@@ -245,6 +248,6 @@ app.get('/leaderboard/:quizId', async (req, res) => {
   }
 });
 
-app.listen(port, "0.0.0.0", () => {
-  console.log(`Listening on port ${port}`);
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Listening on port ${PORT}`);
 });                                   
